@@ -87,7 +87,14 @@ impl Node {
                         let _ = self.pre_prepare(12, 1, digest.clone(), msg.clone()).await;
                     },
                     MessageType::PrePrepare {v, n, d, m} => {
-                        // Handle PrePrepare message
+                        let computed_digest = m.compute_digest();
+
+                        if d == &computed_digest {
+                            println!("Digest match for PrePrepare at Node {}: {}", self.id, d);
+                            self.prepare(*v, *n, d.clone(), self.id).await;
+                        } else {
+                            println!("Digest mismatch at Node {}! Expected: {}, Got: {}", self.id, d, computed_digest);
+                        }
                     },
                     MessageType::Prepare {v, n, d, i} => {
                         // Handle Prepare message
@@ -109,7 +116,7 @@ impl Node {
 
     async fn pre_prepare(&self, v: u64, n: u64, d: String, m: Message) -> Result<()> {
 
-        // Create the proper Pre-Prepare Message
+        // Create the Pre-Prepare Message
         let pre_prepare_msg = Message::new(
             MessageType::PrePrepare { 
                 v: v,
@@ -137,4 +144,36 @@ impl Node {
         Ok(())
 
     }
+
+    async fn prepare(&self, v: u64, n: u64, d: String, i: u64) -> Result<()> {
+
+        //Create the Prepare message
+        let prepare_msg = Message::new(
+            MessageType::Prepare { 
+                v: v,
+                n: n,
+                d: d,
+                i: i   
+            },
+            self.id
+        );
+
+        //Serialize the message to prepare it for sending
+        let serialized_msg = to_vec(&prepare_msg)?;
+        let node_list = self.node_list.lock().await;
+
+        //Multicast <PREPARE, v, n, d, i> to all other replicas
+        for (node_id, port) in node_list.iter() {
+            if *node_id != self.id {
+                let address = format!("127.0.0.1:{}", port);
+                let mut stream = TcpStream::connect(address).await?;
+                stream.write_all(&serialized_msg).await?;
+                println!("Node {} sent a Pre-Prepare message to Node {}", self.id, node_id);
+            }
+        }
+
+        Ok(())
+    }
+
+    
 }
