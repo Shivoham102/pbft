@@ -2,9 +2,7 @@ mod node;
 mod client;
 mod message;
 
-use std::process::{self, exit};
 use std::{collections::HashMap, io};
-use message::MessageType;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use std::sync::Arc;
@@ -36,7 +34,7 @@ async fn run() {
     let f:u64 = input.trim().parse().expect("Please enter a valid integer");
 
     if n < 3 * f + 1 {
-        println!("\x1b[33m\n\n n < 3f + 1, there shouldn't be consensus \n\n\x1b[0m");        
+        println!("\x1b[33m\n\n n ({}) < 3f + 1 ({}), there shouldn't be a consensus \n\n\x1b[0m", n, 3 * f + 1);
     }
     
     //Initialize data structures used by nodes to perform actions
@@ -91,11 +89,11 @@ async fn run() {
             println!("Leader not found in node list");
         }
     }
-    
+
 
     tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl-c");
     println!("Shutting down PBFT simulator");
 
-    
-    
+
+
 }

@@ -14,8 +14,6 @@ use crate::message::{Message, MessageType};
 pub struct LogEntry {
     pub message: Message,
     pub digest: String,
-    // pub v: u64,
-    // pub n: u64
 }
 
 
@@ -111,7 +109,7 @@ impl Node {
                             MessageType::PrePrepare { v, n, d, m } => {
                                 let computed_digest = m.compute_digest();
 
-                                if d == &computed_digest {
+                                if d == &computed_digest && *v == self.view_number {
                                     // println!("\nDigest match for PrePrepare at Node {}: {}", self.id, d);
 
                                     // Clone the message to store in the log
@@ -146,18 +144,19 @@ impl Node {
                     "Prepare" => {
                         // println!("Node {} received Prepare msg", self.id);
 
-                        // Use a `match` block for the message content
                         match &msg.msg_content {
-                            MessageType::Prepare { v, n, d, i } => {
+                            MessageType::Prepare { v, n, d, i: _ } => {
 
-                                {let prepare_counts = self.prepare_counts.read().await;
-                                if let Some(count) = prepare_counts.get(&*v) {
-                                    if *count >= 2 * self.f + 1 {
-                                        // println!("Already received 2f Prepare messages for view {}, skipping.", v);
-                                        return;
+                                {
+                                    let prepare_counts = self.prepare_counts.read().await;
+                                    if let Some(count) = prepare_counts.get(&*v) {
+                                        if *count >= 2 * self.f + 1 {
+                                            // println!("Already received 2f Prepare messages for view {}, skipping.", v);
+                                            return;
+                                        }
                                     }
-                                }}
-
+                                }
+                            
                                 let received_digest = d.clone();
 
                                 // Key for the PrePrepare log entry
@@ -221,12 +220,12 @@ impl Node {
                                 println!("Unexpected message type in Prepare message!");
                             }
                         }
-                    }
+                    },
 
                     "Commit" => {
                         
                         match &msg.msg_content {
-                            MessageType::Commit { v, n, d, i } => {
+                            MessageType::Commit { v, n: _, d, i } => {
                                 println!("Node {} received Commit msg from Node {}", self.id, i);
                                 {
                                     let commit_counts = self.commit_counts.read().await;
@@ -251,7 +250,7 @@ impl Node {
 
                                 // Check if the log entry exists
                                 if let Some(ref log_entry) = log_entry_opt {
-                                    // Check digest match
+                                    // Check digest and view number match
                                     if log_entry.digest == received_digest && *v == self.view_number {
                                         println!("Node {} approved Commit msg from Node {}", self.id, msg.sender_id);
 

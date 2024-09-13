@@ -90,7 +90,7 @@ impl Client {
                 // Process the message based on its type
                 match &msg.msg_type[..] {
                     "Reply" => {
-                        if let MessageType::Reply { v, t, i, r } = msg.msg_content {
+                        if let MessageType::Reply { v: _, t, i: _, r } = msg.msg_content {
                             // Process the reply result
                             println!("\n\n Received Reply with result: {}", r);
                        
@@ -101,18 +101,16 @@ impl Client {
                             let entry = replies.entry(t).or_insert_with(|| (r, 0));
                             if entry.0 == r {
                                 entry.1 += 1;
-                            }                
+                            }
 
                             //Check if client received f + 1 replies and finish execution
                             if entry.1 >= self.f + 1 {
-                                // println!("\n\n Client accepted result = {r} as f + 1 ({}) replies were received \n\n", entry.1);
                                 println!(
                                     "\x1b[32m\n\n Client accepted result = {} as at least f + 1 ({}) replies were received \n\n\x1b[0m",
                                     r,
                                     entry.1
                                 );
-                                process::exit(0);
-                                
+                                process::exit(0);                                
                             }
                         } else {
                             println!("Unexpected message format for Reply");

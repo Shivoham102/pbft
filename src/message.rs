@@ -1,6 +1,5 @@
 use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
-use std::hash::{Hash, Hasher};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 
@@ -41,20 +40,14 @@ pub struct Message {
     pub msg_type: String,
     pub msg_content: MessageType,
     pub sender_id: u64,
-    // pub view: u64,
-    // pub sequence_number: u64,
-    // pub payload: String, // This can be more complex depending on your needs
-    // pub timestamp: Option<u64>,
 }
 
 impl Message {
     pub fn new(msg_type: String, msg_content: MessageType, sender_id: u64) -> Self {
         Message {
             msg_type,
-            msg_content,
-            // payload,
-            sender_id,
-            // timestamp,
+            msg_content,        
+            sender_id,           
         }
     }
 
@@ -68,40 +61,5 @@ impl Message {
         // Get the final hash as a hexadecimal string
         let result = hasher.finalize();
         format!("{:x}", result)
-    }
-}
-
-
-impl Hash for MessageType {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        match self {
-            MessageType::Request { o, t } => {
-                o.hash(state);
-                t.hash(state);
-            }
-            MessageType::PrePrepare { v, n, d, .. } => {
-                v.hash(state);
-                n.hash(state);
-                d.hash(state); // Just hash the digest and ignore the message for the key
-            }
-            MessageType::Prepare { v, n, d, i } => {
-                v.hash(state);
-                n.hash(state);
-                d.hash(state);
-                i.hash(state);
-            }
-            MessageType::Commit { v, n, d, i } => {
-                v.hash(state);
-                n.hash(state);
-                d.hash(state);
-                i.hash(state);
-            },
-            MessageType::Reply { v, t, i, r } => {
-                v.hash(state);
-                t.hash(state);
-                i.hash(state);
-                r.hash(state);
-            },
-        }
     }
 }
