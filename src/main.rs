@@ -36,8 +36,7 @@ async fn run() {
     let f:u64 = input.trim().parse().expect("Please enter a valid integer");
 
     if n < 3 * f + 1 {
-        eprintln!("Exiting execution because n < 3 * f + 1");
-        process::exit(1);
+        println!("\x1b[33m\n\n n < 3f + 1, there shouldn't be consensus \n\n\x1b[0m");        
     }
     
     //Initialize data structures used by nodes to perform actions
@@ -57,20 +56,30 @@ async fn run() {
 
     let v = 1;
     let p = v % n;
+    let mut f_count = 0;
 
     //Spawn the replicas
-    for i in 0..n { 
-        let node = Node::new(i, if i == p {true} else {false}, Arc::clone(&node_list), Arc::clone(&log), v, f, Arc::clone(&prepare_count), Arc::clone(&commit_count));
+    for i in 0..n {
+        let is_faulty = if i != p && f_count < f { // Ensure leader is not faulty and we haven't exceeded the faulty limit
+            f_count += 1;
+            true
+        } else {
+            false
+        };
+        let node = Node::new(i,  i == p, Arc::clone(&node_list), Arc::clone(&log), v, f, is_faulty, Arc::clone(&prepare_count), Arc::clone(&commit_count));
         tokio::spawn(async move {
             node.start().await.expect("Failed to start node");
         }); 
     }
 
+    //Initialize data structure to store replies
+    let reply_list: Arc<Mutex<HashMap<u64, (u64, u64)>>> = Arc::new(Mutex::new(HashMap::new()));
+
     //Spawn the client and give it the leader's port for communication
     match node_list.lock().await.get(&p) {
         
         Some(&leader_port) => {
-            let client = Client::new(100,  leader_port);
+            let client = Client::new(100,  leader_port, reply_list, f);
             tokio::spawn(async move {
                 if let Err(e) = client.start().await {
                     eprintln!("Error starting client: {}", e);

@@ -26,21 +26,23 @@ pub struct Node {
     node_list: Arc<Mutex<HashMap<u64, u64>>>, 
     log: Arc<RwLock<HashMap<(String, u64), LogEntry>>>, //Message type and view numbers are keys for the HaskMap
     view_number: u64, //Tells the current view the node is in
-    f: u64, //number if faulty nodes
+    f: u64, //number of faulty nodes
+    is_faulty: bool,
     prepare_counts: Arc<RwLock<HashMap<u64, u64>>>,    
     commit_counts: Arc<RwLock<HashMap<u64, u64>>>,    
 }
 
 impl Node {
-    pub fn new(id: u64, is_leader: bool, node_list: Arc<Mutex<HashMap<u64, u64>>>, log: Arc<RwLock<HashMap<(String, u64), LogEntry>>>, view_number: u64, f: u64, prepare_counts: Arc<RwLock<HashMap<u64, u64>>>, commit_counts: Arc<RwLock<HashMap<u64, u64>>>
+    pub fn new(id: u64, is_leader: bool, node_list: Arc<Mutex<HashMap<u64, u64>>>, log: Arc<RwLock<HashMap<(String, u64), LogEntry>>>, view_number: u64, f: u64, is_faulty: bool, prepare_counts: Arc<RwLock<HashMap<u64, u64>>>, commit_counts: Arc<RwLock<HashMap<u64, u64>>>
 ) -> Self {
         Self {
             id,
-            is_leader,           
+            is_leader,
             node_list,
             log,
             view_number,
             f,
+            is_faulty,
             prepare_counts,
             commit_counts
         }
@@ -50,6 +52,11 @@ impl Node {
     pub async fn start(&self) -> Result<(), Box<dyn std::error::Error>> {
         let listener = TcpListener::bind(format!("127.0.0.1:{}", 5000 + self.id)).await?;
         println!("Node {} is listening on port {}", self.id, listener.local_addr()?.port());
+        
+        if self.is_faulty {
+            println!("Node {} is faulty", self.id);
+        }
+
         if self.is_leader {
             println!("Node {} is the leader", self.id);
         }
@@ -65,6 +72,12 @@ impl Node {
 
     //Function to handle incoming messages and take action
     async fn handle_connection(&self, socket: &mut TcpStream) {
+
+         // Simulating a faulty node by not processing any incoming messages
+        if self.is_faulty {
+            println!("Faulty Node {} is ignoring the message.", self.id);
+            return;
+        }
 
         // Buffer to store the incoming data
         let mut buf = [0; 1024];
@@ -219,7 +232,7 @@ impl Node {
                                     let commit_counts = self.commit_counts.read().await;
                                     if let Some(count) = commit_counts.get(&*v) {
                                         if *count >= 2 * self.f + 1 {
-                                            println!("Node {} already received 2f Commit messages for view {}, skipping.", self.id, v);
+                                            // println!("Node {} already received 2f Commit messages for view {}, skipping.", self.id, v);
                                             return;
                                         }
                                     }
@@ -274,7 +287,12 @@ impl Node {
                                                         match &log_entry.message.msg_content {                                                         
                                                             
                                                             MessageType::Request { o, t } => {
-                                                                println!("\n\no: {o} and t: {t}");
+                                                                let result: u64 = o.0 + o.1;
+                                                                println!("\n\n o: ({}, {}) and t: {t} for Node {}", o.0, o.1, self.id);
+                                                                println!("Result is {result}");
+                                                                if let Err(e) = self.send_reply(*v, *t, self.id, result).await {
+                                                                    eprintln!("Failed to send Commit message: {:?}", e);
+                                                                }
                                                             }
                                                             _ => {
                                                                 println!("Request message not found");
@@ -492,7 +510,7 @@ impl Node {
                             if let Err(e) = stream.flush().await {
                                 eprintln!("Failed to flush stream to node {}: {:?}", node_id, e);
                             } else {
-                                println!("Node {} sent a Commit message to Node {}", self_id, node_id);
+                                // println!("Node {} sent a Commit message to Node {}", self_id, node_id);
                             }
                         }
                         Err(e) => {
@@ -502,6 +520,28 @@ impl Node {
                 });
             }
         }
+
+        Ok(())
+    }
+
+    async fn send_reply(&self, v: u64, t: u64, i: u64, r: u64) -> Result<()> {
+        let reply_msg = Message::new(
+            "Reply".to_string(),
+            MessageType::Reply { 
+                v: v,
+                t: t,
+                i: i,
+                r: r   
+            },
+            self.id
+        );
+
+        //Serialize the message to prepare it for sending
+        let serialized_msg = to_vec(&reply_msg)?;
+         
+        let client_address = format!("127.0.0.1:{}", 5100);
+        let mut stream = TcpStream::connect(client_address).await?;
+        stream.write_all(&serialized_msg).await?;
 
         Ok(())
     }

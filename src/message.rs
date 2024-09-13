@@ -7,7 +7,7 @@ use std::hash::{Hash, Hasher};
 //Create custom types for all the 5 message types
 pub enum MessageType {
     Request {
-        o: String,
+        o: (u64, u64),
         t: u64
     },
     PrePrepare {
@@ -32,7 +32,7 @@ pub enum MessageType {
         v: u64,
         t: u64,
         i : u64,
-        r: String
+        r: u64
     },
 }
 
