@@ -54,6 +54,7 @@ impl Client {
     //Function to send <REQUEST, o, t, c> to the Primary
     pub async fn request (&self, o: String, t: u64) -> Result<()> {
         let message =  Message::new(
+            "Request".to_string(),
             MessageType::Request { 
                 o: "Operation X + Y".to_string(),
                 t: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()
