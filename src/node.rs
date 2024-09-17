@@ -52,11 +52,11 @@ impl Node {
         println!("Node {} is listening on port {}", self.id, listener.local_addr()?.port());
         
         if self.is_faulty {
-            println!("Node {} is faulty", self.id);
+            println!("Node {} is faulty and will ignore messages", self.id);
         }
 
         if self.is_leader {
-            println!("Node {} is the leader", self.id);
+            println!("Node {} is the primary", self.id);
         }
 
         loop {
@@ -73,7 +73,7 @@ impl Node {
 
          // Simulating a faulty node by not processing any incoming messages
         if self.is_faulty {
-            println!("Faulty Node {} is ignoring the message.", self.id);
+            // println!("Faulty Node {} is ignoring the message.", self.id);
             return;
         }
 
@@ -88,8 +88,7 @@ impl Node {
                 }
 
                 // Deserialize the message
-                let msg: Message = serde_json::from_slice(&buf[0..size]).expect("Failed to deserialize message");
-                // println!("Node {} received a message: {:?}", self.id, msg);
+                let msg: Message = serde_json::from_slice(&buf[0..size]).expect("Failed to deserialize message");               
 
 
                 // Process the message based on its type
@@ -98,7 +97,8 @@ impl Node {
                     "Request" => {
                         // Compute the digest of the message
                         let digest = msg.compute_digest();
-                        println!("Node {} computed digest: {}", self.id, digest);
+                        println!("\nPrimary Node {} computed digest of Request: {}", self.id, digest);
+                        println!("Going into PrePrepare Phase\n");
 
                         // Send PrePrepare after computing digest
                         let _ = self.send_pre_prepare(self.view_number, 1, digest.clone(), msg.clone()).await;
@@ -110,7 +110,6 @@ impl Node {
                                 let computed_digest = m.compute_digest();
 
                                 if d == &computed_digest && *v == self.view_number {
-                                    // println!("\nDigest match for PrePrepare at Node {}: {}", self.id, d);
 
                                     // Clone the message to store in the log
                                     let log_entry = LogEntry {
@@ -147,11 +146,11 @@ impl Node {
                         match &msg.msg_content {
                             MessageType::Prepare { v, n, d, i: _ } => {
 
+                                //Skip processing if already received at least 2f Prepare messages
                                 {
                                     let prepare_counts = self.prepare_counts.read().await;
                                     if let Some(count) = prepare_counts.get(&*v) {
-                                        if *count >= 2 * self.f + 1 {
-                                            // println!("Already received 2f Prepare messages for view {}, skipping.", v);
+                                        if *count >= 2 * self.f + 1 {                                   
                                             return;
                                         }
                                     }
@@ -172,7 +171,7 @@ impl Node {
                                 if let Some(log_entry) = log_entry {
                                     // Check digest match
                                     if log_entry.digest == received_digest && *v == self.view_number {
-                                        println!("Node {} approved Prepare msg from Node {}", self.id, msg.sender_id);
+                                        // println!("Node {} approved Prepare msg from Node {}", self.id, msg.sender_id);
 
                                         // Prepare to write to the log
                                         let key = ("Prepare".to_string(), *v);
@@ -202,7 +201,7 @@ impl Node {
                                             let prepare_counts = self.prepare_counts.read().await;
                                             if let Some(count) = prepare_counts.get(&*v) {
                                                 if *count >= 2 * self.f + 1 {
-                                                    println!("Received 2f Prepare messages, calling send_commit");
+                                                    println!("Node {} received 2f Prepare messages, going into Commit Phase", self.id);
                                                     if let Err(e) = self.send_commit(*v, *n, d.clone(), self.id).await {
                                                         eprintln!("Failed to send Commit message: {:?}", e);
                                                     }
@@ -225,8 +224,9 @@ impl Node {
                     "Commit" => {
                         
                         match &msg.msg_content {
-                            MessageType::Commit { v, n: _, d, i } => {
-                                println!("Node {} received Commit msg from Node {}", self.id, i);
+                            MessageType::Commit { v, n: _, d, i : _} => {
+                                // println!("Node {} received Commit msg from Node {}", self.id, i);
+                                 //Skip processing if already received at least 2f Commit messages
                                 {
                                     let commit_counts = self.commit_counts.read().await;
                                     if let Some(count) = commit_counts.get(&*v) {
@@ -252,7 +252,7 @@ impl Node {
                                 if let Some(ref log_entry) = log_entry_opt {
                                     // Check digest and view number match
                                     if log_entry.digest == received_digest && *v == self.view_number {
-                                        println!("Node {} approved Commit msg from Node {}", self.id, msg.sender_id);
+                                        // println!("Node {} approved Commit msg from Node {}", self.id, msg.sender_id);
 
                                         // Prepare to write to the log
                                         let key = ("Commit".to_string(), *v);
@@ -287,8 +287,9 @@ impl Node {
                                                             
                                                             MessageType::Request { o, t } => {
                                                                 let result: u64 = o.0 + o.1;
-                                                                println!("\n\n o: ({}, {}) and t: {t} for Node {}", o.0, o.1, self.id);
-                                                                println!("Result is {result}");
+                                                                // println!("\n\n o: ({}, {}) and t: {t} for Node {}", o.0, o.1, self.id);
+                                                                // println!("Result is {result}");
+                                                                println!("Node {} received 2f Commit messages, sending result to Client", self.id);
                                                                 if let Err(e) = self.send_reply(*v, *t, self.id, result).await {
                                                                     eprintln!("Failed to send Commit message: {:?}", e);
                                                                 }

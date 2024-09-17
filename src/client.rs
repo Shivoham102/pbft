@@ -38,7 +38,7 @@ impl Client {
         println!("Client {} is listening on port {}", self.id, listener.local_addr()?.port());
 
         //Set the timeout duration for consensus
-        let timeout_duration = Duration::from_secs(5);
+        let timeout_duration = Duration::from_secs(10);
 
         // Send the request
         self.request((5, 8), SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs()).await?;
@@ -92,7 +92,7 @@ impl Client {
                     "Reply" => {
                         if let MessageType::Reply { v: _, t, i: _, r } = msg.msg_content {
                             // Process the reply result
-                            println!("\n\n Received Reply with result: {}", r);
+                            // println!("\n\n Received Reply with result: {}", r);
                        
                             
                             let mut replies = self.reply_list.lock().await;
@@ -145,7 +145,7 @@ impl Client {
         let mut stream = TcpStream::connect(leader_address).await?;
         stream.write_all(&serialized_msg).await?;
 
-        println!("Client {} sent request to leader on port {}: {:?}", self.id, self.leader_port, message);
+        println!("\nClient {} sent request to leader on port {}: {:?}", self.id, self.leader_port, message);
 
         Ok(())
     }

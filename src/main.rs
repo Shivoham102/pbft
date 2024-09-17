@@ -58,7 +58,7 @@ async fn run() {
 
     //Spawn the replicas
     for i in 0..n {
-        let is_faulty = if i != p && f_count < f { // Ensure leader is not faulty and we haven't exceeded the faulty limit
+        let is_faulty = if i != p && f_count < f { // Ensure primary is not faulty and we haven't exceeded the faulty limit
             f_count += 1;
             true
         } else {
@@ -86,7 +86,7 @@ async fn run() {
         }
 
         None => {
-            println!("Leader not found in node list");
+            println!("Primary not found in node list");
         }
     }
 
